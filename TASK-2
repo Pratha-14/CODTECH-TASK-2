@@ -1,0 +1,271 @@
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Random;
+import java.util.Scanner;
+import java.util.UUID;
+
+// Main Banking System Class
+public class BankingSystem {
+
+    public static void main(String[] args) {
+        // Initialize services
+        AccountService accountService = new AccountService();
+        TransactionService transactionService = new TransactionService();
+        TransferService transferService = new TransferService(transactionService);
+        Scanner scanner = new Scanner(System.in);
+
+        // Main menu loop
+        while (true) {
+            System.out.println("\n---------------------------------");
+            System.out.println("1. Register Account");
+            System.out.println("2. Make a Deposit");
+            System.out.println("3. Withdraw Money");
+            System.out.println("4. Transfer Funds");
+            System.out.println("5. View Transaction History");
+            System.out.println("6. Exit");
+            System.out.println("---------------------------------");
+            System.out.print("Select an option: ");
+
+            int choice = scanner.nextInt();
+            scanner.nextLine(); // Consume newline
+
+            switch (choice) {
+                case 1:
+                    System.out.print("Enter account holder name: ");
+                    String name = scanner.nextLine();
+                    System.out.print("Enter initial deposit: ");
+                    double initialDeposit = scanner.nextDouble();
+                    accountService.createAccount(name, initialDeposit);
+                    break;
+                case 2:
+                    System.out.print("Enter account number (xxx-xx-xxxxxxx-x) "  );
+                    String accountNumber = scanner.nextLine();
+                    System.out.print("Enter deposit amount: ");
+                    double depositAmount = scanner.nextDouble();
+                    Account account = accountService.getAccountByNumber(accountNumber);
+                    if (account != null) {
+                        account.deposit(depositAmount);
+                        transactionService.addTransaction("Deposit", account, depositAmount);
+                        System.out.println("Deposit successful.");
+                    } else {
+                        System.out.println("Account not found.");
+                    }
+                    break;
+                case 3:
+                    System.out.print("Enter account number: ");
+                    accountNumber = scanner.nextLine();
+                    System.out.print("Enter withdrawal amount: ");
+                    double withdrawalAmount = scanner.nextDouble();
+                    account = accountService.getAccountByNumber(accountNumber);
+                    if (account != null) {
+                        try {
+                            account.withdraw(withdrawalAmount);
+                            transactionService.addTransaction("Withdrawal", account, withdrawalAmount);
+                            System.out.println("Withdrawal successful.");
+                        } catch (Exception e) {
+                            System.out.println(e.getMessage());
+                        }
+                    } else {
+                        System.out.println("Account not found.");
+                    }
+                    break;
+                case 4:
+                    System.out.print("Enter your account number: ");
+                    String senderAccountNumber = scanner.nextLine();
+                    System.out.print("Enter recipient account number: ");
+                    String recipientAccountNumber = scanner.nextLine();
+                    System.out.print("Enter amount to transfer: ");
+                    double transferAmount = scanner.nextDouble();
+                    Account sender = accountService.getAccountByNumber(senderAccountNumber);
+                    Account recipient = accountService.getAccountByNumber(recipientAccountNumber);
+                    if (sender != null && recipient != null) {
+                        transferService.transferFunds(sender, recipient, transferAmount);
+                    } else {
+                        System.out.println("Invalid account details.");
+                    }
+                    break;
+                case 5:
+                    System.out.print("Enter account number to view transaction history: ");
+                    accountNumber = scanner.nextLine();
+                    List<Transaction> transactions = transactionService.getTransactionsForAccount(accountNumber);
+                    if (transactions.isEmpty()) {
+                        System.out.println("No transactions found.");
+                    } else {
+                        for (Transaction t : transactions) {
+                            System.out.println(t);
+                        }
+                    }
+                    break;
+                case 6:
+                    System.out.println("Exiting...");
+                    scanner.close();
+                    System.exit(0);
+                default:
+                    System.out.println("Invalid option. Please try again.");
+            }
+        }
+    }
+}
+
+// Account Class
+class Account {
+    private String accountNumber;
+    private String accountHolderName;
+    private double balance;
+
+    public Account(String accountHolderName, double balance) {
+        this.accountNumber = AccountNumberGenerator.generateAccountNumber(1);  // Generates a structured account number
+        this.accountHolderName = accountHolderName;
+        this.balance = balance;
+    }
+
+    public String getAccountNumber() {
+        return accountNumber;
+    }
+
+    public String getAccountHolderName() {
+        return accountHolderName;
+    }
+
+    public double getBalance() {
+        return balance;
+    }
+
+    public void deposit(double amount) {
+        this.balance += amount;
+    }
+
+    public void withdraw(double amount) throws Exception {
+        if (amount > balance) {
+            throw new Exception("Insufficient funds.");
+        }
+        this.balance -= amount;
+    }
+
+    public void transfer(double amount, Account recipient) throws Exception {
+        this.withdraw(amount);
+        recipient.deposit(amount);
+    }
+}
+
+// AccountService Class
+class AccountService {
+    private List<Account> accountDatabase = new ArrayList<>();
+
+    public void createAccount(String accountHolderName, double initialDeposit) {
+        Account account = new Account(accountHolderName, initialDeposit);
+        accountDatabase.add(account);
+        System.out.println("Account created successfully: " + account.getAccountHolderName() +
+                " Account Number: " + account.getAccountNumber() +
+                " Balance: " + account.getBalance());
+    }
+
+    public Account getAccountByNumber(String accountNumber) {
+        for (Account account : accountDatabase) {
+            if (account.getAccountNumber().equals(accountNumber)) {
+                return account;
+            }
+        }
+        return null;
+    }
+}
+
+// Transaction Class
+class Transaction {
+    private String type;
+    private String accountNumber;
+    private double amount;
+    private String date;
+private String time;
+    public Transaction(String type, String accountNumber, double amount) {
+        this.type = type;
+        this.accountNumber = accountNumber;
+        this.amount = amount;
+        this.date = java.time.LocalDate.now().toString();
+        this.time = java.time.LocalTime.now().toString();
+    }
+
+    public String toString() {
+        return "Transaction Type: " + type + " | Account: " + accountNumber + " | Amount: " + amount + " | Date: " + date + " | Time: " +time;
+    }
+}
+
+// TransactionService Class
+class TransactionService {
+    private List<Transaction> transactionHistory = new ArrayList<>();
+
+    public void addTransaction(String type, Account account, double amount) {
+        Transaction transaction = new Transaction(type, account.getAccountNumber(), amount);
+        transactionHistory.add(transaction);
+    }
+
+    public List<Transaction> getTransactionsForAccount(String accountNumber) {
+        List<Transaction> accountTransactions = new ArrayList<>();
+        for (Transaction t : transactionHistory) {
+            if (t.toString().contains(accountNumber)) {
+                accountTransactions.add(t);
+            }
+        }
+        return accountTransactions;
+    }
+}
+
+// TransferService Class
+class TransferService {
+    private TransactionService transactionService;
+
+    public TransferService(TransactionService transactionService) {
+        this.transactionService = transactionService;
+    }
+
+    public void transferFunds(Account sender, Account recipient, double amount) {
+        try {
+            sender.transfer(amount, recipient);
+            transactionService.addTransaction("Transfer Out", sender, amount);
+            transactionService.addTransaction("Transfer In", recipient, amount);
+            System.out.println("Transfer successful from " + sender.getAccountHolderName() +
+                    " to " + recipient.getAccountHolderName());
+        } catch (Exception e) {
+            System.out.println("Transfer failed: " + e.getMessage());
+        }
+    }
+}
+
+// Account Number Generator Class
+class AccountNumberGenerator {
+
+    // Generate a random 3-digit bank code
+    public static String generateBankCode() {
+        return String.format("%03d", new Random().nextInt(1000)); // 3-digit bank code
+    }
+
+    // Generate a 2-digit account type code (e.g., 01 for savings, 02 for checking)
+    public static String generateAccountType(int accountType) {
+        return String.format("%02d", accountType); // 2-digit account type
+    }
+
+    // Generate a unique 7-digit customer identifier
+    public static String generateCustomerIdentifier() {
+        return String.format("%07d", new Random().nextInt(10000000)); // 7-digit unique number
+    }
+
+    // Calculate a simple checksum (last digit, could be more complex)
+    public static String calculateCheckDigit(String accountNumberWithoutCheckDigit) {
+        int sum = 0;
+        for (char digit : accountNumberWithoutCheckDigit.toCharArray()) {
+            sum += Character.getNumericValue(digit);
+        }
+        return String.valueOf(sum % 10); // Simple checksum based on sum of digits
+    }
+
+    // Generate the full account number
+    public static String generateAccountNumber(int accountType) {
+        String bankCode = generateBankCode();              // 3-digit bank code
+        String accountTypeCode = generateAccountType(accountType);  // 2-digit account type
+        String customerIdentifier = generateCustomerIdentifier();   // 7-digit customer id
+        String withoutChecksum = bankCode + accountTypeCode + customerIdentifier;
+        String checkDigit = calculateCheckDigit(withoutChecksum);   // 1-digit checksum
+
+        return bankCode + "-" + accountTypeCode + "-" + customerIdentifier + "-" + checkDigit;
+    }
+}
